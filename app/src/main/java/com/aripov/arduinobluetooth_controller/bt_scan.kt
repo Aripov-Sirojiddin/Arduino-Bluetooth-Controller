@@ -14,6 +14,7 @@ import android.os.Bundle
 import android.service.autofill.OnClickAction
 import android.view.View
 import android.widget.Button
+import android.widget.ProgressBar
 import android.widget.Toast
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.ActivityResult
@@ -26,9 +27,10 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 
-class bt_scan : AppCompatActivity()  {
+class bt_scan : AppCompatActivity(), RecyclerViewAdapter.OnItemClickListener  {
   //Activity for result launchers
   private lateinit var enableBTLauncher: ActivityResultLauncher<Intent>
+  private lateinit var makeDiscoverableLauncher: ActivityResultLauncher<Intent>
   private lateinit var requestPermissionLauncher: ActivityResultLauncher<String>
   //Recycler view
   private lateinit var pairedRecyclerView: RecyclerView
@@ -39,6 +41,9 @@ class bt_scan : AppCompatActivity()  {
 
   //Buttons
   private lateinit var scanBTN : Button
+
+  //Progress bar
+  private lateinit var progressBar : ProgressBar
 
   //Bluetooth
   private lateinit var bluetoothManager: BluetoothManager
@@ -86,13 +91,17 @@ class bt_scan : AppCompatActivity()  {
     scanBTN.setOnClickListener{
       startOrStopScan()
     }
+
+    //Progress Bar
+    progressBar = findViewById(R.id.progressBar)
+
     //Recycler View
-    pairedAdapter = RecyclerViewAdapter(mutableListOf())
+    pairedAdapter = RecyclerViewAdapter(mutableListOf(), this)
     pairedRecyclerView = findViewById(R.id.pairedDevices)
     pairedRecyclerView.layoutManager = LinearLayoutManager(this)
     pairedRecyclerView.adapter = pairedAdapter
 
-    discoveredAdapter = RecyclerViewAdapter(mutableListOf())
+    discoveredAdapter = RecyclerViewAdapter(mutableListOf(), this)
     discoveredRecyclerView = findViewById(R.id.discoveredDevices)
     discoveredRecyclerView.layoutManager = LinearLayoutManager(this)
     discoveredRecyclerView.adapter = discoveredAdapter
@@ -118,6 +127,16 @@ class bt_scan : AppCompatActivity()  {
       }
     }
 
+    makeDiscoverableLauncher = registerForActivityResult(
+      ActivityResultContracts.StartActivityForResult()
+    ){ result: ActivityResult ->
+      if(result.resultCode != Activity.RESULT_OK) {
+        Toast.makeText(application, "Device is not discoverable", Toast.LENGTH_SHORT).show()
+      } else {
+        Toast.makeText(application, "Device is discoverable", Toast.LENGTH_SHORT).show()
+      }
+    }
+
     requestAllPermissions()
     if(!bluetoothAdapter.isEnabled){
       requestEnableBT()
@@ -127,7 +146,20 @@ class bt_scan : AppCompatActivity()  {
       registerReceiver(receiver, filter)
     }
   }
-
+  private fun requestAllPermissions() {
+    requestPermissionLauncher.launch(Manifest.permission.BLUETOOTH_CONNECT)
+    requestPermissionLauncher.launch(Manifest.permission.BLUETOOTH_SCAN)
+    requestPermissionLauncher.launch(Manifest.permission.BLUETOOTH_ADVERTISE)
+    requestPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+    requestPermissionLauncher.launch(Manifest.permission.ACCESS_COARSE_LOCATION)
+  }
+  private fun requestEnableBT() {
+    val enableBtIntent = Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE)
+    if (ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
+      requestPermissionLauncher.launch(Manifest.permission.BLUETOOTH_CONNECT)
+    }
+    enableBTLauncher.launch(enableBtIntent)
+  }
   private fun startOrStopScan() {
     if(bluetoothAdapter.isEnabled) {
       if (scanBTN.text == "Start Scan") {
@@ -140,23 +172,16 @@ class bt_scan : AppCompatActivity()  {
         }
         bluetoothAdapter.startDiscovery()
         scanBTN.text = "Stop Scan"
+        progressBar.visibility = View.VISIBLE
       } else {
         bluetoothAdapter.cancelDiscovery()
         scanBTN.text = "Start Scan"
+        progressBar.visibility = View.GONE
       }
     } else {
       requestEnableBT()
     }
   }
-
-  private fun requestEnableBT() {
-    val enableBtIntent = Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE)
-    if (ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
-      requestPermissionLauncher.launch(Manifest.permission.BLUETOOTH_CONNECT)
-    }
-    enableBTLauncher.launch(enableBtIntent)
-  }
-
   private fun queryPairedDevices() {
     if (ActivityCompat.checkSelfPermission(application, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
       requestPermissionLauncher.launch(Manifest.permission.BLUETOOTH_CONNECT)
@@ -169,12 +194,15 @@ class bt_scan : AppCompatActivity()  {
       ))
     }
   }
-  private fun requestAllPermissions() {
-    requestPermissionLauncher.launch(Manifest.permission.BLUETOOTH_CONNECT)
-    requestPermissionLauncher.launch(Manifest.permission.BLUETOOTH_SCAN)
-    requestPermissionLauncher.launch(Manifest.permission.BLUETOOTH_ADVERTISE)
-    requestPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
-    requestPermissionLauncher.launch(Manifest.permission.ACCESS_COARSE_LOCATION)
+  private fun setDeviceDiscoverable() {
+    val discoverableIntent: Intent = Intent(BluetoothAdapter.ACTION_REQUEST_DISCOVERABLE).apply {
+      putExtra(BluetoothAdapter.EXTRA_DISCOVERABLE_DURATION, 300)
+    }
+    makeDiscoverableLauncher.launch(discoverableIntent)
+  }
+
+  override fun onItemClick(position: Int) {
+    setDeviceDiscoverable()
   }
   override fun onDestroy() {
     super.onDestroy()

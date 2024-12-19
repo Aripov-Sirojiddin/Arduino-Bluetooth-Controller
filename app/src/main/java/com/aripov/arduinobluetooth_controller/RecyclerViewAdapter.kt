@@ -3,13 +3,23 @@ package com.aripov.arduinobluetooth_controller
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.AdapterView.OnItemClickListener
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 
-class RecyclerViewAdapter(private val devicesList: MutableList<DiscoveredBTDevice>) : RecyclerView.Adapter<RecyclerViewAdapter.ViewHolder>() {
-  class ViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
+class RecyclerViewAdapter(private val devicesList: MutableList<DiscoveredBTDevice>, private val itemClickListener: OnItemClickListener) : RecyclerView.Adapter<RecyclerViewAdapter.ViewHolder>() {
+  inner class ViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
     val deviceNameView: TextView = itemView.findViewById(R.id.deviceName)
     val deviceMacView: TextView = itemView.findViewById(R.id.deviceMacAddress)
+
+    init {
+      itemView.setOnClickListener{
+        itemClickListener.onItemClick(adapterPosition)
+      }
+    }
+  }
+  interface OnItemClickListener {
+    fun onItemClick(position: Int)
   }
 
   override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
