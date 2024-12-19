@@ -11,7 +11,6 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.os.Bundle
-import android.service.autofill.OnClickAction
 import android.view.View
 import android.widget.Button
 import android.widget.ProgressBar
@@ -27,7 +26,7 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 
-class bt_scan : AppCompatActivity(), RecyclerViewAdapter.OnItemClickListener  {
+class bt_scan : AppCompatActivity()  {
   //Activity for result launchers
   private lateinit var enableBTLauncher: ActivityResultLauncher<Intent>
   private lateinit var makeDiscoverableLauncher: ActivityResultLauncher<Intent>
@@ -96,12 +95,16 @@ class bt_scan : AppCompatActivity(), RecyclerViewAdapter.OnItemClickListener  {
     progressBar = findViewById(R.id.progressBar)
 
     //Recycler View
-    pairedAdapter = RecyclerViewAdapter(mutableListOf(), this)
+    pairedAdapter = RecyclerViewAdapter(mutableListOf()) { position ->
+      connectToDevice(pairedAdapter, position)
+    }
     pairedRecyclerView = findViewById(R.id.pairedDevices)
     pairedRecyclerView.layoutManager = LinearLayoutManager(this)
     pairedRecyclerView.adapter = pairedAdapter
 
-    discoveredAdapter = RecyclerViewAdapter(mutableListOf(), this)
+    discoveredAdapter = RecyclerViewAdapter(mutableListOf(), { position ->
+      connectToDevice(discoveredAdapter, position)
+    })
     discoveredRecyclerView = findViewById(R.id.discoveredDevices)
     discoveredRecyclerView.layoutManager = LinearLayoutManager(this)
     discoveredRecyclerView.adapter = discoveredAdapter
@@ -130,11 +133,7 @@ class bt_scan : AppCompatActivity(), RecyclerViewAdapter.OnItemClickListener  {
     makeDiscoverableLauncher = registerForActivityResult(
       ActivityResultContracts.StartActivityForResult()
     ){ result: ActivityResult ->
-      if(result.resultCode != Activity.RESULT_OK) {
-        Toast.makeText(application, "Device is not discoverable", Toast.LENGTH_SHORT).show()
-      } else {
-        Toast.makeText(application, "Device is discoverable", Toast.LENGTH_SHORT).show()
-      }
+
     }
 
     requestAllPermissions()
@@ -146,6 +145,7 @@ class bt_scan : AppCompatActivity(), RecyclerViewAdapter.OnItemClickListener  {
       registerReceiver(receiver, filter)
     }
   }
+
   private fun requestAllPermissions() {
     requestPermissionLauncher.launch(Manifest.permission.BLUETOOTH_CONNECT)
     requestPermissionLauncher.launch(Manifest.permission.BLUETOOTH_SCAN)
@@ -172,6 +172,7 @@ class bt_scan : AppCompatActivity(), RecyclerViewAdapter.OnItemClickListener  {
         }
         bluetoothAdapter.startDiscovery()
         scanBTN.text = "Stop Scan"
+        discoveredAdapter.resetView()
         progressBar.visibility = View.VISIBLE
       } else {
         bluetoothAdapter.cancelDiscovery()
@@ -201,9 +202,22 @@ class bt_scan : AppCompatActivity(), RecyclerViewAdapter.OnItemClickListener  {
     makeDiscoverableLauncher.launch(discoverableIntent)
   }
 
-  override fun onItemClick(position: Int) {
+  private fun connectToDevice(adapter: RecyclerViewAdapter, position: Int) {
     setDeviceDiscoverable()
+    val device = bluetoothAdapter.getRemoteDevice(adapter.getDevice(position).mac)
+    if (ActivityCompat.checkSelfPermission(
+        this,
+        Manifest.permission.BLUETOOTH_CONNECT
+      ) != PackageManager.PERMISSION_GRANTED
+    ) {
+      requestPermissionLauncher.launch(Manifest.permission.BLUETOOTH_CONNECT)
+    }
+    if(device != null) {
+      Toast.makeText(application, "${device.name}", Toast.LENGTH_SHORT).show()
+    }
+
   }
+
   override fun onDestroy() {
     super.onDestroy()
     unregisterReceiver(receiver)

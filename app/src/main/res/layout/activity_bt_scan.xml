@@ -21,6 +21,9 @@
 
         <Button
             android:id="@+id/btnScan"
+            android:textColor="@color/white"
+            android:backgroundTint="#6FD5FD"
+            android:textSize="20sp"
             android:layout_width="1dp"
             android:layout_height="wrap_content"
             android:layout_marginEnd="2.5dp"
