@@ -1,16 +1,20 @@
 package com.aripov.arduinobluetooth_controller
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.app.Activity
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothManager
+import android.bluetooth.BluetoothSocket
 import android.content.BroadcastReceiver
+import android.content.ContentValues.TAG
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.os.Bundle
+import android.util.Log
 import android.view.View
 import android.widget.Button
 import android.widget.ProgressBar
@@ -25,6 +29,8 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import java.io.IOException
+import java.util.UUID
 
 class bt_scan : AppCompatActivity()  {
   //Activity for result launchers
@@ -133,7 +139,6 @@ class bt_scan : AppCompatActivity()  {
     makeDiscoverableLauncher = registerForActivityResult(
       ActivityResultContracts.StartActivityForResult()
     ){ result: ActivityResult ->
-
     }
 
     requestAllPermissions()
@@ -147,6 +152,8 @@ class bt_scan : AppCompatActivity()  {
   }
 
   private fun requestAllPermissions() {
+    requestPermissionLauncher.launch(Manifest.permission.BLUETOOTH)
+    requestPermissionLauncher.launch(Manifest.permission.BLUETOOTH_ADMIN)
     requestPermissionLauncher.launch(Manifest.permission.BLUETOOTH_CONNECT)
     requestPermissionLauncher.launch(Manifest.permission.BLUETOOTH_SCAN)
     requestPermissionLauncher.launch(Manifest.permission.BLUETOOTH_ADVERTISE)
@@ -162,25 +169,28 @@ class bt_scan : AppCompatActivity()  {
   }
   private fun startOrStopScan() {
     if(bluetoothAdapter.isEnabled) {
-      if (scanBTN.text == "Start Scan") {
-        if (ActivityCompat.checkSelfPermission(
-            this,
-            Manifest.permission.BLUETOOTH_SCAN
-          ) != PackageManager.PERMISSION_GRANTED
-        ) {
-          requestPermissionLauncher.launch(Manifest.permission.BLUETOOTH_SCAN)
-        }
-        bluetoothAdapter.startDiscovery()
-        scanBTN.text = "Stop Scan"
-        discoveredAdapter.resetView()
-        progressBar.visibility = View.VISIBLE
-      } else {
-        bluetoothAdapter.cancelDiscovery()
-        scanBTN.text = "Start Scan"
-        progressBar.visibility = View.GONE
-      }
+      setDiscoverable(scanBTN.text == "Start Scan")
     } else {
       requestEnableBT()
+    }
+  }
+  private fun setDiscoverable(condition : Boolean) {
+    if (condition) {
+      if (ActivityCompat.checkSelfPermission(
+          this,
+          Manifest.permission.BLUETOOTH_SCAN
+        ) != PackageManager.PERMISSION_GRANTED
+      ) {
+        requestPermissionLauncher.launch(Manifest.permission.BLUETOOTH_SCAN)
+      }
+      bluetoothAdapter.startDiscovery()
+      scanBTN.text = "Stop Scan"
+      discoveredAdapter.resetView()
+      progressBar.visibility = View.VISIBLE
+    } else {
+      bluetoothAdapter.cancelDiscovery()
+      scanBTN.text = "Start Scan"
+      progressBar.visibility = View.GONE
     }
   }
   private fun queryPairedDevices() {
@@ -204,7 +214,6 @@ class bt_scan : AppCompatActivity()  {
 
   private fun connectToDevice(adapter: RecyclerViewAdapter, position: Int) {
     setDeviceDiscoverable()
-    val device = bluetoothAdapter.getRemoteDevice(adapter.getDevice(position).mac)
     if (ActivityCompat.checkSelfPermission(
         this,
         Manifest.permission.BLUETOOTH_CONNECT
@@ -212,12 +221,21 @@ class bt_scan : AppCompatActivity()  {
     ) {
       requestPermissionLauncher.launch(Manifest.permission.BLUETOOTH_CONNECT)
     }
+    val device = bluetoothAdapter.getRemoteDevice(adapter.getDevice(position).mac)
+    val sppUUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB")
     if(device != null) {
-      Toast.makeText(application, "${device.name}", Toast.LENGTH_SHORT).show()
+      Toast.makeText(application, "Attempting connection with ${device.name}...", Toast.LENGTH_SHORT).show()
+      try {
+        setDiscoverable(false)
+        val socket = device.createInsecureRfcommSocketToServiceRecord(sppUUID)
+        socket.connect()
+
+
+      } catch (e: IOException) {
+        e.printStackTrace()
+      }
     }
-
   }
-
   override fun onDestroy() {
     super.onDestroy()
     unregisterReceiver(receiver)
