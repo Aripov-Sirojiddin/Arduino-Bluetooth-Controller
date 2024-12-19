@@ -229,7 +229,10 @@ class bt_scan : AppCompatActivity()  {
         setDiscoverable(false)
         val socket = device.createInsecureRfcommSocketToServiceRecord(sppUUID)
         socket.connect()
-
+        if(socket != null && socket.isConnected) {
+          Socket.socket = socket
+          startActivity(Intent(this, Controller::class.java))
+        }
 
       } catch (e: IOException) {
         e.printStackTrace()
